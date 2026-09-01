@@ -49,3 +49,9 @@ export async function cancelEmail(id: number) {
 
   return response.data;
 }
+
+export async function getAllEmails() {
+  const response = await apiClient.get("/emails/all");
+
+  return response.data;
+}

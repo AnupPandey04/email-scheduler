@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import EmailCard from "../components/EmailCard";
 import {
-  getScheduledEmails,
-  getSentEmails,
+  getAllEmails,
   cancelEmail,
 } from "../api/emails";
 
@@ -19,7 +18,9 @@ interface Email {
 
 function Dashboard() {
   const [scheduled, setScheduled] = useState<Email[]>([]);
+  const [processing, setProcessing] = useState<Email[]>([]);
   const [sent, setSent] = useState<Email[]>([]);
+  const [failed, setFailed] = useState<Email[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -31,14 +32,33 @@ function Dashboard() {
       setLoading(true);
       setError("");
 
-      const [scheduledResponse, sentResponse] =
-        await Promise.all([
-          getScheduledEmails(),
-          getSentEmails(),
-        ]);
+      const response = await getAllEmails();
 
-      setScheduled(scheduledResponse.data || []);
-      setSent(sentResponse.data || []);
+      const emails: Email[] = response.data || [];
+
+      setScheduled(
+        emails.filter(
+          (email) => email.status === "SCHEDULED"
+        )
+      );
+
+      setProcessing(
+        emails.filter(
+          (email) => email.status === "PROCESSING"
+        )
+      );
+
+      setSent(
+        emails.filter(
+          (email) => email.status === "SENT"
+        )
+      );
+
+      setFailed(
+        emails.filter(
+          (email) => email.status === "FAILED"
+        )
+      );
     } catch (error: any) {
       console.error("Failed to load emails:", error);
 
@@ -133,7 +153,8 @@ function Dashboard() {
         )}
 
         {/* Stats */}
-        <div className="mb-10 grid gap-5 sm:grid-cols-2">
+        <div className="mb-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Scheduled */}
           <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
             <div className="flex items-center justify-between">
               <div>
@@ -152,6 +173,26 @@ function Dashboard() {
             </div>
           </div>
 
+          {/* Processing */}
+          <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">
+                  Processing
+                </p>
+
+                <p className="mt-2 text-3xl font-bold text-gray-900">
+                  {processing.length}
+                </p>
+              </div>
+
+              <div className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">
+                In Progress
+              </div>
+            </div>
+          </div>
+
+          {/* Sent */}
           <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
             <div className="flex items-center justify-between">
               <div>
@@ -166,6 +207,25 @@ function Dashboard() {
 
               <div className="rounded-lg bg-green-50 px-3 py-2 text-xs font-semibold text-green-700">
                 Delivered
+              </div>
+            </div>
+          </div>
+
+          {/* Failed */}
+          <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">
+                  Failed
+                </p>
+
+                <p className="mt-2 text-3xl font-bold text-gray-900">
+                  {failed.length}
+                </p>
+              </div>
+
+              <div className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                Failed
               </div>
             </div>
           </div>
@@ -211,6 +271,74 @@ function Dashboard() {
                       cancelling={
                         cancellingId === email.id
                       }
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Processing Emails */}
+            <section>
+              <div className="mb-4">
+                <h2 className="text-xl font-bold text-gray-900">
+                  Processing Emails
+                </h2>
+
+                <p className="mt-1 text-sm text-gray-500">
+                  Emails currently being processed by the worker.
+                </p>
+              </div>
+
+              {processing.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center">
+                  <h3 className="font-semibold text-gray-700">
+                    No emails processing
+                  </h3>
+
+                  <p className="mt-1 text-sm text-gray-500">
+                    Emails being processed will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-5 md:grid-cols-2">
+                  {processing.map((email) => (
+                    <EmailCard
+                      key={email.id}
+                      email={email}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Failed Emails */}
+            <section>
+              <div className="mb-4">
+                <h2 className="text-xl font-bold text-gray-900">
+                  Failed Emails
+                </h2>
+
+                <p className="mt-1 text-sm text-gray-500">
+                  Emails that could not be delivered after retries.
+                </p>
+              </div>
+
+              {failed.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center">
+                  <h3 className="font-semibold text-gray-700">
+                    No failed emails
+                  </h3>
+
+                  <p className="mt-1 text-sm text-gray-500">
+                    Emails that fail after all retry attempts will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-5 md:grid-cols-2">
+                  {failed.map((email) => (
+                    <EmailCard
+                      key={email.id}
+                      email={email}
                     />
                   ))}
                 </div>
