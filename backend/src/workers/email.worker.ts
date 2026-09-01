@@ -9,6 +9,7 @@ import { emails, emailLogs } from "../db/schema.js";
 
 const worker = new Worker(
   "email-scheduler",
+
   async (job) => {
     const { emailId } = job.data;
 
@@ -16,7 +17,6 @@ const worker = new Worker(
       `Processing email ${emailId}, job ${job.id}`
     );
 
-    // Retrieve the authoritative email record.
     const records = await db
       .select()
       .from(emails)
@@ -29,7 +29,6 @@ const worker = new Worker(
       throw new Error(`Email ${emailId} not found`);
     }
 
-    // Idempotency protection.
     if (email.status === "SENT") {
       console.log(
         `Email ${emailId} already sent. Skipping.`
@@ -41,7 +40,6 @@ const worker = new Worker(
       };
     }
 
-    // Mark as processing.
     await db
       .update(emails)
       .set({
@@ -79,7 +77,9 @@ const worker = new Worker(
         message: `Email sent successfully. Message ID: ${result.messageId}`,
       });
 
-      console.log(`Email ${email.id} sent successfully`);
+      console.log(
+        `Email ${email.id} sent successfully`
+      );
 
       return result;
     } catch (error) {
@@ -127,14 +127,28 @@ const worker = new Worker(
       throw error;
     }
   },
+
   {
     connection: redisConnection,
     concurrency: 2,
   }
 );
 
+worker.on("ready", () => {
+  console.log("BullMQ worker is ready");
+});
+
+worker.on("active", (job) => {
+  console.log(
+    `BullMQ picked up job ${job.id}`
+  );
+});
+
 worker.on("completed", (job, result) => {
-  console.log(`Worker completed job ${job.id}`);
+  console.log(
+    `Worker completed job ${job.id}`
+  );
+
   console.log("Result:", result);
 });
 
@@ -145,9 +159,16 @@ worker.on("failed", (job, error) => {
   );
 });
 
+worker.on("error", (error) => {
+  console.error(
+    "BullMQ worker error:",
+    error.message
+  );
+});
+
 console.log("Email worker started...");
 
-const PORT = Number(process.env.PORT) || 10000;
+const PORT = Number(process.env.PORT) || 5000;
 const HOST = "0.0.0.0";
 
 http
