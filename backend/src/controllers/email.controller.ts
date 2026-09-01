@@ -3,6 +3,7 @@ import {
   scheduleEmail,
   getScheduledEmails,
   getSentEmails,
+  getAllEmails,
   getEmailById,
   cancelScheduledEmail,
 } from "../services/email.service.js";
@@ -163,6 +164,7 @@ export async function getSent(
     }
 }
 
+
 export async function getSingleEmail(
     req: AuthenticatedRequest,
     res: Response
@@ -252,6 +254,34 @@ export async function cancelEmail(
     return res.status(400).json({
       success: false,
       message,
+    });
+  }
+}
+
+export async function getAll(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    const result = await getAllEmails(req.user.userId);
+
+    return res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error("Get all emails error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch emails",
     });
   }
 }

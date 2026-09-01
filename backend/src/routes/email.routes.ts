@@ -4,6 +4,7 @@ import {
   createScheduledEmail,
   getScheduled,
   getSent,
+  getAll,
   getSingleEmail,
   cancelEmail,
 } from "../controllers/email.controller.js";
@@ -19,6 +20,8 @@ router.post("/", createScheduledEmail);
 router.get("/scheduled", getScheduled);
 
 router.get("/sent", getSent);
+
+router.get("/all", getAll);
 
 router.get("/:id", getSingleEmail);
 

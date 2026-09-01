@@ -104,6 +104,14 @@ export async function getSentEmails(userId: number) {
     .orderBy(desc(emails.sentAt));
 }
 
+export async function getAllEmails(userId: number) {
+  return db
+    .select()
+    .from(emails)
+    .where(eq(emails.userId, userId))
+    .orderBy(desc(emails.updatedAt));
+}
+
 export async function getEmailById(
   userId: number,
   emailId: number
@@ -176,3 +184,4 @@ export async function cancelScheduledEmail(
     status: "CANCELLED",
   };
 }
+
