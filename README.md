@@ -1,122 +1,74 @@
 # Email Scheduler
 
-A production-style email scheduling application built with React,
-Node.js, Express, MySQL, Redis, BullMQ, and Docker.
+A production-oriented email scheduling system that allows users to register, authenticate, schedule emails, cancel pending emails, and track email delivery status.
 
-The application allows authenticated users to compose emails, schedule
-them for a future time, view scheduled/sent emails, and cancel emails
-before they are processed. Scheduled jobs are handled asynchronously by
-a dedicated BullMQ worker.
+The application uses BullMQ and Redis for reliable background job processing, MySQL for persistent storage, and Ethereal SMTP for email delivery.
 
 ## Features
+- User registration and login
+- JWT-based authentication
+- Schedule emails for future delivery
+- Background email processing using BullMQ
+- Redis-backed job queue
+- Automatic retry with exponential backoff
+- Idempotent email processing
+- Email status tracking
+- Processing, sent, failed, and cancelled states
+- Email audit logs
+- Cancel scheduled emails
+- Responsive React dashboard
+- Production deployment support
+- Health-check endpoint
+- Helmet security headers
+- Morgan request logging
+- API rate limiting
+- Ethereal SMTP integration
 
--   User registration and login with JWT authentication
--   Password hashing with bcrypt
--   Protected email-management APIs
--   Schedule emails for a future date and time
--   View scheduled and sent emails from the dashboard
--   Cancel emails that have not yet been sent
--   Asynchronous email processing with BullMQ
--   Redis-backed job queue
--   MySQL persistence with Drizzle ORM
--   SMTP email delivery with Nodemailer
--   Ethereal Email support for development/testing
--   Request security with Helmet
--   CORS configuration
--   HTTP request logging with Morgan
--   Rate limiting support
--   Dockerized frontend, backend, worker, MySQL, and Redis
--   Production frontend served with Nginx
--   Database migrations managed with Drizzle Kit
+## Architecture
+
+```text
+React Frontend (Render)
+        |
+        v
+Express Backend (Render)
+        |
+        +----> Aiven MySQL
+        |
+        v
+Hosted Redis
+        |
+        v
+BullMQ Worker
+        |
+        v
+Ethereal SMTP
+```
 
 ## Tech Stack
 
 ### Frontend
-
--   React
--   TypeScript
--   Vite
--   React Router
--   Axios
--   Tailwind CSS
+React, TypeScript, Vite, Tailwind CSS, Axios
 
 ### Backend
+Node.js, Express, TypeScript, JWT, bcryptjs, Helmet, Morgan, Express Rate Limit
 
--   Node.js
--   Express
--   TypeScript
--   JWT
--   bcrypt
--   Nodemailer
--   Drizzle ORM
+### Database
+MySQL, Aiven Cloud, Drizzle ORM
 
-### Infrastructure
+### Background Processing
+Redis, BullMQ, ioredis
 
--   MySQL 8.4
--   Redis 7
--   BullMQ
--   Docker / Docker Compose
--   Nginx
+### Email
+Nodemailer, Ethereal SMTP
 
-## Architecture
-
-``` text
-                         ┌──────────────────────┐
-                         │      React App       │
-                         │   Vite + TypeScript  │
-                         └──────────┬───────────┘
-                                    │ HTTP / REST
-                                    ▼
-                         ┌──────────────────────┐
-                         │    Express API       │
-                         │  Authentication      │
-                         │  Email Scheduling    │
-                         └───────┬───────┬──────┘
-                                 │       │
-                         SQL     │       │ Jobs
-                                 ▼       ▼
-                       ┌────────────┐  ┌────────────┐
-                       │   MySQL    │  │   Redis    │
-                       │  Database  │  │  + BullMQ  │
-                       └────────────┘  └─────┬──────┘
-                                             │
-                                             ▼
-                                    ┌────────────────┐
-                                    │ Email Worker   │
-                                    │  BullMQ Worker │
-                                    └───────┬────────┘
-                                            │
-                                            ▼
-                                    ┌────────────────┐
-                                    │ SMTP /         │
-                                    │ Ethereal Email │
-                                    └────────────────┘
-```
-
-### Request flow
-
-1.  A user registers or logs in.
-2.  The API returns a JWT token.
-3.  The frontend stores the token and sends it with authenticated API
-    requests.
-4.  When an email is scheduled, the backend stores the email record in
-    MySQL.
-5.  A delayed BullMQ job is created in Redis.
-6.  The worker waits for the scheduled job.
-7.  When the job becomes available, the worker sends the email through
-    SMTP.
-8.  The email record is updated with its final status and delivery
-    information.
-9.  The dashboard displays the current email status.
+### Deployment
+Render, Aiven Cloud
 
 ## Project Structure
 
-``` text
+```text
 email-scheduler/
 ├── backend/
-│   ├── drizzle/
-│   │   ├── meta/
-│   │   └── *.sql
 │   ├── src/
 │   │   ├── config/
 │   │   ├── controllers/
@@ -127,459 +79,283 @@ email-scheduler/
 │   │   ├── services/
 │   │   ├── workers/
 │   │   ├── app.ts
-│   │   ├── server.ts
-│   │   └── test-smtp.ts
-│   ├── .env.example
-│   ├── Dockerfile
+│   │   └── server.ts
 │   ├── Dockerfile.worker
-│   ├── drizzle.config.ts
 │   ├── package.json
 │   └── tsconfig.json
-│
 ├── frontend/
 │   ├── src/
-│   │   ├── api/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── App.tsx
-│   │   └── main.tsx
-│   ├── Dockerfile
-│   ├── nginx.conf
 │   ├── package.json
 │   └── vite.config.ts
-│
-├── .env.example
-├── .gitignore
-├── docker-compose.yml
-├── package.json
 └── README.md
 ```
 
-## Prerequisites
+## Email Processing Flow
 
-For local development without Docker:
+```text
+1. User schedules email
+2. Backend validates request
+3. Email record is created in MySQL
+4. BullMQ delayed job is created
+5. Redis stores the job
+6. Job becomes available at the scheduled time
+7. BullMQ worker processes the job
+8. Status becomes PROCESSING
+9. Nodemailer sends through Ethereal
+10. Status becomes SENT
+11. Audit log records the result
+```
 
--   Node.js 20+
--   MySQL 8+
--   Redis 7+
--   An SMTP account such as Ethereal Email
+## Retry Mechanism
 
-For the Docker setup, Docker Desktop is sufficient.
+Email jobs use BullMQ retry functionality:
+
+```text
+attempts: 3
+backoff: exponential
+initial delay: 5 seconds
+```
+
+Failed jobs are retried automatically. After the final failed attempt, the email is marked `FAILED`, with the error stored in MySQL and recorded in the audit log.
+
+## Idempotency
+
+The worker checks the database before sending:
+
+```text
+if email.status === "SENT"
+    skip processing
+```
+
+This prevents an already-sent email from being sent again if the same job is processed more than once.
+
+## Email Statuses
+
+| Status | Description |
+|---|---|
+| SCHEDULED | Email is waiting for its scheduled time |
+| PROCESSING | Worker is currently processing the email |
+| SENT | Email was successfully sent |
+| FAILED | All retry attempts failed |
+| CANCELLED | User cancelled the scheduled email |
+
+## API Endpoints
+
+### Authentication
+
+```text
+POST /api/auth/register
+POST /api/auth/login
+```
+
+### Emails
+
+```text
+POST   /api/emails
+GET    /api/emails/all
+GET    /api/emails/scheduled
+GET    /api/emails/sent
+GET    /api/emails/:id
+DELETE /api/emails/:id
+```
+
+All email endpoints require JWT authentication.
+
+### Health Check
+
+```text
+GET /health
+```
 
 ## Environment Variables
 
-Create the required environment file from the provided example.
+Create `backend/.env`:
 
-``` powershell
-Copy-Item .env.example .env
-```
+```env
+PORT=5000
 
-The environment configuration contains values for:
-
-``` env
-MYSQL_ROOT_PASSWORD=
 DB_HOST=
 DB_PORT=
+DB_NAME=
 DB_USER=
 DB_PASSWORD=
-DB_NAME=
+DB_SSL=true
 
-REDIS_HOST=
-REDIS_PORT=
+REDIS_URL=
 
 JWT_SECRET=
 
-SMTP_HOST=
-SMTP_PORT=
+SMTP_HOST=smtp.ethereal.email
+SMTP_PORT=587
 SMTP_USER=
 SMTP_PASSWORD=
 SMTP_FROM=
 ```
 
-Never commit `.env` files or real credentials to GitHub.
+For local Redis development, `REDIS_HOST` and `REDIS_PORT` may be used instead.
 
-The repository includes `.env.example` files containing configuration
-placeholders/examples.
+Never commit `.env` or expose database passwords, Redis URLs, JWT secrets, SMTP passwords, or API keys.
 
-## Running with Docker Compose
-
-The project includes Docker Compose configuration for:
-
--   MySQL
--   Redis
--   Express backend
--   BullMQ worker
--   React frontend served through Nginx
-
-Start all services:
-
-``` powershell
-docker compose up -d
-```
-
-Check service status:
-
-``` powershell
-docker compose ps
-```
-
-Expected services:
-
-``` text
-email_scheduler_mysql
-email_scheduler_redis
-email_scheduler_backend
-email_scheduler_worker
-email_scheduler_frontend
-```
-
-View backend logs:
-
-``` powershell
-docker compose logs backend --tail=50
-```
-
-View worker logs:
-
-``` powershell
-docker compose logs worker --tail=50
-```
-
-Stop the application:
-
-``` powershell
-docker compose down
-```
-
-## Application URLs
-
-When running with the included Docker Compose configuration:
-
--   Frontend: `http://localhost:5173`
--   Backend API: `http://localhost:5000`
--   Health check: `http://localhost:5000/health`
--   MySQL host port: `3307`
--   Redis host port: `6379`
-
-## Database
-
-The project uses Drizzle ORM and Drizzle Kit.
-
-From the backend directory:
-
-``` powershell
-cd backend
-```
-
-Generate a migration after changing the schema:
-
-``` powershell
-npm run db:generate
-```
-
-Apply migrations:
-
-``` powershell
-npm run db:migrate
-```
-
-Build the backend:
-
-``` powershell
-npm run build
-```
-
-Start the production backend:
-
-``` powershell
-npm start
-```
-
-## Backend Development
-
-From `backend/`:
-
-``` powershell
-npm install
-npm run dev
-```
-
-Run the worker during development:
-
-``` powershell
-npm run worker
-```
-
-Test the SMTP configuration:
-
-``` powershell
-npx tsx src/test-smtp.ts
-```
-
-## Frontend Development
-
-From `frontend/`:
-
-``` powershell
-npm install
-npm run dev
-```
-
-Build the frontend:
-
-``` powershell
-npm run build
-```
-
-Preview the production build:
-
-``` powershell
-npm run preview
-```
-
-## API Overview
-
-### Authentication
-
-``` text
-POST /api/auth/register
-POST /api/auth/login
-```
-
-Registration and login return authentication information used by the
-frontend for protected requests.
-
-### Email Scheduling
-
-``` text
-POST   /api/emails
-GET    /api/emails
-GET    /api/emails/sent
-DELETE /api/emails/:id
-```
-
-Authenticated requests use:
-
-``` http
-Authorization: Bearer <JWT_TOKEN>
-```
-
-### Health Check
-
-``` text
-GET /health
-```
-
-Example response:
-
-``` json
-{
-  "success": true,
-  "message": "Email Scheduler API is running"
-}
-```
-
-## Email Scheduling Workflow
-
-A typical scheduling request contains:
-
-``` json
-{
-  "recipient": "recipient@example.com",
-  "subject": "Scheduled Email",
-  "body": "This email was scheduled.",
-  "scheduledAt": "2026-09-01T12:00:00.000Z"
-}
-```
-
-The API creates:
-
--   A persistent email record in MySQL
--   A corresponding BullMQ job in Redis
-
-The worker processes the job at the scheduled time and sends the email
-through the configured SMTP server.
-
-## Email Cancellation
-
-An email can be cancelled while it is still pending.
-
-If an email has already been sent, cancellation is rejected.
-
-Example application behavior:
-
-``` text
-PENDING   → can be cancelled
-SENT      → cannot be cancelled
-CANCELLED → no longer processed
-FAILED    → delivery failed
-```
-
-## SMTP Testing
-
-The project supports Ethereal Email for safe development/testing.
-
-Ethereal provides a preview URL for sent messages rather than delivering
-them to a real recipient inbox.
-
-A successful worker execution produces information similar to:
-
-``` text
-Email worker started...
-Processing email 8, job email-8
-Email 8 sent successfully
-Worker completed job email-8
-Result: {
-  messageId: "...@ethereal.email",
-  previewUrl: "https://ethereal.email/message/..."
-}
-```
-
-For production deployment, replace the SMTP configuration with the
-credentials of your chosen email provider.
-
-## Docker Services
-
-### MySQL
-
-Stores:
-
--   Users
--   Scheduled emails
--   Email logs
-
-### Redis
-
-Used by BullMQ for:
-
--   Delayed jobs
--   Queue state
--   Worker coordination
+## Local Development
 
 ### Backend
 
-Provides:
-
--   Authentication APIs
--   Email APIs
--   Scheduling logic
--   Database access
+```bash
+cd backend
+npm install
+npm run dev
+```
 
 ### Worker
 
-Runs independently from the API and processes scheduled email jobs.
+In another terminal:
 
-This separation prevents email delivery work from blocking normal API
-requests.
+```bash
+cd backend
+npm run worker
+```
 
 ### Frontend
 
-The React application is built into static assets and served through
-Nginx.
-
-## Security
-
-The application includes several security measures:
-
--   JWT-based authentication
--   Password hashing with bcrypt
--   Protected email endpoints
--   Helmet security headers
--   CORS configuration
--   Rate limiting support
--   Environment-based secrets
--   `.env` files excluded from version control
-
-## Verification
-
-Useful checks after starting the application:
-
-``` powershell
-docker compose ps
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
-Verify the API:
-
-``` powershell
-Invoke-RestMethod http://localhost:5000/health
-```
-
-Verify database tables:
-
-``` powershell
-docker exec email_scheduler_mysql mysql -u scheduler -pschedulerpassword email_scheduler -e "SHOW TABLES;"
-```
-
-The database should contain the application tables and Drizzle migration
-table.
+The frontend normally runs at `http://localhost:5173`.
 
 ## Production Build
 
-Build the frontend:
+### Backend
 
-``` powershell
+```bash
+cd backend
+npm run build
+npm start
+```
+
+### Worker
+
+```bash
+cd backend
+npm run build
+npm run worker:prod
+```
+
+### Frontend
+
+```bash
 cd frontend
 npm run build
 ```
 
-Build the backend:
+## Deployment
 
-``` powershell
-cd ..\backend
-npm run build
+The frontend and backend are deployed on Render. Aiven MySQL provides persistent storage, Redis provides BullMQ queue management, and Ethereal provides test SMTP delivery.
+
+### Worker Deployment Note
+
+The BullMQ worker has been successfully tested against the deployed Redis instance.
+
+The Render free environment may restrict outbound SMTP connections. Because Ethereal SMTP requires an outbound SMTP connection, the worker can be run locally while connected to the deployed Redis instance.
+
+This allows the deployed backend to enqueue jobs into the deployed Redis queue while the local worker consumes those jobs and sends emails through Ethereal.
+
+```text
+Hosted Frontend
+      |
+      v
+Hosted Backend
+      |
+      v
+Aiven MySQL
+      |
+      v
+Hosted Redis
+      |
+      v
+Local BullMQ Worker
+      |
+      v
+Ethereal SMTP
 ```
 
-Build Docker images:
+## Testing
 
-``` powershell
-cd ..
-docker compose build
+The complete workflow has been tested using:
+
+```text
+React Frontend
+      |
+      v
+Render Backend
+      |
+      v
+Aiven MySQL
+      |
+      v
+Redis
+      |
+      v
+BullMQ
+      |
+      v
+Worker
+      |
+      v
+Nodemailer
+      |
+      v
+Ethereal SMTP
 ```
 
-Start the complete stack:
+Successful worker output:
 
-``` powershell
-docker compose up -d
+```text
+BullMQ worker is ready
+BullMQ picked up job email-X
+Processing email X, job email-X
+Email X sent successfully
+Worker completed job email-X
 ```
 
-## Demo
+Ethereal provides a preview URL for inspecting test emails.
 
-The project demonstrates:
+## Reliability
 
-1.  Account registration
-2.  User login
-3.  JWT-protected dashboard
-4.  Email composition
-5.  Future email scheduling
-6.  Scheduled email listing
-7.  Email cancellation
-8.  BullMQ delayed-job processing
-9.  SMTP email delivery
-10. Worker status and email processing
-11. Dockerized multi-service deployment
+- Redis-backed asynchronous job processing
+- Delayed BullMQ jobs
+- Automatic retries
+- Exponential backoff
+- Idempotency protection
+- Persistent email status
+- Audit logs
+- Database-first email creation
+- Job IDs associated with email records
 
-## Repository
+## Security
 
-GitHub:
+- JWT authentication
+- Password hashing with bcrypt
+- Helmet security headers
+- CORS configuration
+- API rate limiting
+- Input validation
+- Environment-based secrets
+- Authenticated email operations
 
-https://github.com/AnupPandey04/email-scheduler
+## Future Improvements
 
-## Hosted Application
+- Deploy the worker on infrastructure that permits outbound SMTP
+- Add email templates
+- Add recurring schedules
+- Add pagination and filtering
+- Add real-time job status updates
+- Add delivery analytics
+- Use a production email provider such as Resend, SendGrid, or Amazon SES
+- Add automated tests and CI/CD
 
-Add the final deployed application URL here after deployment:
+## License
 
-``` text
-Hosted URL: <YOUR_DEPLOYED_APPLICATION_URL>
-```
-
-## Demo Video
-
-Add the final Loom or Google Drive demonstration URL here:
-
-``` text
-Demo Video: <YOUR_DEMO_VIDEO_URL>
-```
-
-## Author
-
-Anup Pandey
+This project is developed for educational and assignment purposes.
