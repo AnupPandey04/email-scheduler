@@ -12,9 +12,13 @@ const app = express();
 app.use(helmet());
 
 // Allow frontend to access backend
+// Allow frontend to access backend
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: [
+      "http://localhost:5173",
+      "https://email-scheduler-frontend-jq4k.onrender.com",
+    ],
   })
 );
 
