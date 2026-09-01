@@ -1,3 +1,4 @@
+import http from "node:http";
 import { Worker } from "bullmq";
 import { eq } from "drizzle-orm";
 
@@ -145,3 +146,20 @@ worker.on("failed", (job, error) => {
 });
 
 console.log("Email worker started...");
+
+const PORT = Number(process.env.PORT) || 10000;
+const HOST = "0.0.0.0";
+
+http
+  .createServer((_req, res) => {
+    res.writeHead(200, {
+      "Content-Type": "text/plain",
+    });
+
+    res.end("Email worker is running");
+  })
+  .listen(PORT, HOST, () => {
+    console.log(
+      `Worker health server running on ${HOST}:${PORT}`
+    );
+  });
